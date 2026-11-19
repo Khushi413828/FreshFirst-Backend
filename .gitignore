@@ -1,29 +1,35 @@
+
+# Python environments
 venv/
 .venv/
+backend/venv/
+
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Environment and secret files
 .env
 .env.*
 !.env.example
+
+# Runtime files
 instance/
 *.log
 .DS_Store
 Thumbs.db
 
-# Backup files
+# Backend backup files
 backend/app_backup.py
 backend/app_before_final_update.py
+backend/app_before_final_*.py
+backend/app_full_copy.txt
 backend/db_backup.py
 
-# Python environment
-backend/venv/
-
-# Backup files
+# Database backup files
 database/*.backup
 database/*_backup.sql
 database/*_restore_test.sql
-backend/app_backup.py
-backend/app_before_final_update.py
-backend/db_backup.py
 
+# Documentation backup files
 documentation/*.backup
