@@ -1,0 +1,169 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fresh First - Users</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f5f6fc;color:#252b45}
+.sidebar{position:fixed;width:235px;height:100vh;background:#211b45;color:white;padding:25px 16px}
+.logo{font-size:25px;font-weight:bold;margin-bottom:35px;padding-left:12px}
+.menu a{display:block;color:#d9d5ef;text-decoration:none;padding:13px 15px;border-radius:8px;margin:5px 0}
+.menu a:hover,.menu a.active{background:#5144a5;color:white}
+.main{margin-left:235px;padding:30px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+h1{font-size:27px}
+.subtitle{color:#777;margin-top:7px}
+button{border:0;padding:10px 16px;border-radius:7px;cursor:pointer;font-weight:bold}
+.primary{background:#5144a5;color:white}
+.primary:hover{background:#40358c}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:25px}
+.card{background:white;padding:22px;border-radius:12px;box-shadow:0 2px 10px #00000008}
+.card p{color:#777;font-size:14px}
+.card h2{font-size:27px;margin-top:12px}
+.toolbar{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+input,select{padding:11px;border:1px solid #ddd;border-radius:7px;font-size:14px}
+#search{flex:1;min-width:180px}
+.tablebox{background:white;border-radius:12px;padding:20px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:15px}
+th,td{text-align:left;padding:14px 10px;border-bottom:1px solid #eee;font-size:14px}
+th{color:#777;background:#fafaff}
+.role{padding:5px 10px;border-radius:20px;font-size:12px;background:#eee9ff;color:#5144a5}
+.actions button{padding:7px 10px;margin:2px}
+.edit{background:#e9e7ff;color:#5144a5}
+.delete{background:#ffe8e8;color:#d33}
+.modal{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;padding:15px}
+.modalbox{background:white;padding:25px;border-radius:12px;width:100%;max-width:430px}
+.modalbox h2{margin-bottom:20px}
+.modalbox label{display:block;margin:12px 0 6px;font-size:14px}
+.modalbox input,.modalbox select{width:100%}
+.modalbuttons{display:flex;gap:10px;margin-top:20px}
+.modalbuttons button{flex:1}
+.cancel{background:#eee;color:#333}
+.empty{text-align:center;color:#888;padding:30px}
+@media(max-width:750px){
+.sidebar{width:65px;padding:20px 7px}
+.logo{font-size:0;padding:0}
+.logo:after{content:"FF";font-size:17px}
+.menu a{font-size:0;text-align:center;padding:13px 4px}
+.menu a:first-letter{font-size:15px}
+.main{margin-left:65px;padding:18px}
+.stats{grid-template-columns:1fr}
+.top{align-items:flex-start;gap:12px;flex-wrap:wrap}
+}
+</style>
+</head>
+
+<body>
+
+<aside class="sidebar">
+    <div class="logo">Fresh First</div>
+    <nav class="menu">
+        <a href="dashboard.html">▣ Dashboard</a>
+        <a href="stock.html">▤ Stock</a>
+        <a href="categories.html">▦ Categories</a>
+        <a href="verification.html">✓ Verification</a>
+        <a href="priority.html">⚑ Priority</a>
+        <a href="actions.html">☷ Actions</a>
+        <a href="history.html">◷ History</a>
+        <a href="reports.html">▥ Reports</a>
+        <a href="users.html" class="active">♙ Users</a>
+        <a href="settings.html">⚙ Settings</a>
+        <a href="#" onclick="logout()">↪ Logout</a>
+    </nav>
+</aside>
+
+<main class="main">
+
+    <div class="top">
+        <div>
+            <h1>User Management</h1>
+            <p class="subtitle">Manage system users and their roles</p>
+        </div>
+        <button class="primary" onclick="openAdd()">+ Add User</button>
+    </div>
+
+    <section class="stats">
+        <div class="card">
+            <p>Total Users</p>
+            <h2 id="totalUsers">0</h2>
+        </div>
+        <div class="card">
+            <p>Administrators</p>
+            <h2 id="adminCount">0</h2>
+        </div>
+        <div class="card">
+            <p>Staff Members</p>
+            <h2 id="staffCount">0</h2>
+        </div>
+    </section>
+
+    <div class="toolbar">
+        <input id="search" placeholder="Search by name or username...">
+        <select id="roleFilter">
+            <option value="">All Roles</option>
+            <option value="Admin">Admin</option>
+            <option value="Store Manager">Manager</option>
+            <option value="Staff">Staff</option>
+        </select>
+    </div>
+
+    <section class="tablebox">
+        <h3>System Users</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Full Name</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Created Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="userTable">
+                <tr>
+                    <td colspan="6" class="empty">Loading users...</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+</main>
+
+<div class="modal" id="userModal">
+    <div class="modalbox">
+        <h2 id="modalTitle">Add User</h2>
+
+        <input type="hidden" id="editId">
+
+        <label>Full Name</label>
+        <input id="fullName" placeholder="Enter full name">
+
+        <label>Username</label>
+        <input id="usernameInput" placeholder="Enter username">
+
+        <label>Password</label>
+        <input id="passwordInput" type="password" placeholder="Enter password">
+
+        <label>Role</label>
+        <select id="userRole">
+            <option value="Admin">Admin</option>
+            <option value="Store Manager">Store Manager</option>
+            <option value="Staff">Staff</option>
+        </select>
+
+        <div class="modalbuttons">
+            <button class="cancel" onclick="closeModal()">Cancel</button>
+            <button class="primary" onclick="saveUser()">Save User</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/users.js"></script>
+
+</body>
+</html>

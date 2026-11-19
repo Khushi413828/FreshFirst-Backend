@@ -1,0 +1,29 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+instance/
+*.log
+.DS_Store
+Thumbs.db
+
+# Backup files
+backend/app_backup.py
+backend/app_before_final_update.py
+backend/db_backup.py
+
+# Python environment
+backend/venv/
+
+# Backup files
+database/*.backup
+database/*_backup.sql
+database/*_restore_test.sql
+backend/app_backup.py
+backend/app_before_final_update.py
+backend/db_backup.py
+
+documentation/*.backup
