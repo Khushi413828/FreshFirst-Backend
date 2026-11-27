@@ -1078,33 +1078,42 @@ def manage_verifications():
             cursor.close()
             connection.close()
 
-    # POST: Add a new verification
+       # POST: Add a new verification using the MariaDB stored procedure
+
     data = request.get_json(silent=True) or {}
 
     product_id = data.get("product_id") or data.get("productId")
     product_name = data.get("product_name") or data.get("productName")
+
     actual_temperature = (
         data.get("actualTemperature")
         if data.get("actualTemperature") is not None
         else data.get("temperature", data.get("actual_temperature"))
     )
+
     quantity_value = data.get("quantity")
     remarks = str(data.get("remarks", "")).strip()[:255]
 
+    # Validate optional quantity
     verified_quantity = None
+
     if quantity_value not in (None, ""):
         try:
             if isinstance(quantity_value, bool):
                 raise ValueError
+
             verified_quantity = float(quantity_value)
+
             if not math.isfinite(verified_quantity) or verified_quantity <= 0:
                 raise ValueError
+
         except (ValueError, TypeError):
             return jsonify({
                 "status": "error",
                 "message": "Enter a valid quantity greater than zero."
             }), 400
 
+    # Validate actual temperature
     if actual_temperature is None:
         return jsonify({
             "status": "error",
@@ -1130,37 +1139,30 @@ def manage_verifications():
         }), 400
 
     connection = get_db_connection()
+
+    if not connection:
+        return jsonify({
+            "status": "error",
+            "message": "Database connection failed."
+        }), 500
+
     cursor = connection.cursor(dictionary=True)
 
     try:
+        # Find the active product
         if product_id:
             cursor.execute("""
-                SELECT
-                    p.product_id,
-                    p.product_name,
-                    p.quantity,
-                    p.expiry_date,
-                    c.min_storage_temp,
-                    c.max_storage_temp,
-                    c.near_expiry_days
-                FROM products p
-                JOIN categories c ON p.category_id = c.category_id
-                WHERE p.product_id = %s AND p.is_active = 1
+                SELECT product_id, product_name
+                FROM products
+                WHERE product_id = %s AND is_active = 1
             """, (product_id,))
 
         elif product_name:
             cursor.execute("""
-                SELECT
-                    p.product_id,
-                    p.product_name,
-                    p.quantity,
-                    p.expiry_date,
-                    c.min_storage_temp,
-                    c.max_storage_temp,
-                    c.near_expiry_days
-                FROM products p
-                JOIN categories c ON p.category_id = c.category_id
-                WHERE p.product_name = %s AND p.is_active = 1
+                SELECT product_id, product_name
+                FROM products
+                WHERE product_name = %s AND is_active = 1
+                ORDER BY product_id DESC
                 LIMIT 1
             """, (product_name,))
 
@@ -1178,62 +1180,37 @@ def manage_verifications():
                 "message": "Active product not found."
             }), 404
 
-        today = date.today()
-        expiry_date = product["expiry_date"]
-
-        if isinstance(expiry_date, datetime):
-            expiry_date = expiry_date.date()
-
-        days_left = (expiry_date - today).days
-
-        min_temp = float(product["min_storage_temp"])
-        max_temp = float(product["max_storage_temp"])
-        near_expiry_days = int(product["near_expiry_days"])
-
-        quantity_mismatch = (
-            verified_quantity is not None
-            and verified_quantity != float(product["quantity"])
+        # Call the MariaDB stored procedure
+        cursor.callproc(
+            "record_product_verification",
+            (
+                product["product_id"],
+                session["user_id"],
+                actual_temperature,
+                verified_quantity,
+                remarks
+            )
         )
 
-        if days_left < 0:
-            verification_status = "UNSAFE"
-        elif (
-            actual_temperature < min_temp
-            or actual_temperature > max_temp
-            or days_left <= near_expiry_days
-            or quantity_mismatch
-        ):
-            verification_status = "WARNING"
+        # Read the result returned by the procedure
+        procedure_result = None
+
+        for result in cursor.stored_results():
+            procedure_result = result.fetchone()
+
+        if not procedure_result:
+            raise RuntimeError(
+                "Verification procedure did not return a result."
+            )
+
+        if isinstance(procedure_result, dict):
+            verification_id = procedure_result["verification_id"]
+            verification_status = procedure_result["verification_status"]
         else:
-            verification_status = "SAFE"
+            verification_id = procedure_result[0]
+            verification_status = procedure_result[1]
 
-        if quantity_mismatch:
-            quantity_note = (
-                f"Quantity mismatch: entered {verified_quantity:g}, "
-                f"recorded stock {float(product['quantity']):g}."
-            )
-            remarks = (remarks + " " + quantity_note).strip()[:255]
-
-        cursor.execute("""
-            INSERT INTO verifications
-            (
-                product_id,
-                actual_temperature,
-                verification_status,
-                remarks,
-                verified_by
-            )
-            VALUES (%s, %s, %s, %s, %s)
-        """, (
-            product["product_id"],
-            actual_temperature,
-            verification_status,
-            remarks,
-            session["user_id"]
-        ))
-
-        verification_id = cursor.lastrowid
-
+        # Record the activity in history
         add_history(
             cursor,
             product["product_id"],
@@ -1252,6 +1229,8 @@ def manage_verifications():
 
     except Exception as error:
         connection.rollback()
+        print("Product Verification Error:", error)
+
         return jsonify({
             "status": "error",
             "message": str(error)
@@ -1260,7 +1239,6 @@ def manage_verifications():
     finally:
         cursor.close()
         connection.close()
-
 
 # ============================================================
 # PRODUCT PRIORITY MANAGEMENT
